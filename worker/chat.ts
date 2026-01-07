@@ -15,9 +15,13 @@ export class ChatHandler {
   private mockMode: boolean = false;
 
   constructor(aiGatewayUrl: string, apiKey: string, model: string) {
-    this.mockMode = !aiGatewayUrl || !apiKey;
+    this.mockMode = !aiGatewayUrl?.includes('gate.ai.cloudflare.com') || 
+                    aiGatewayUrl?.includes('YOUR_ACCOUNT') || 
+                    aiGatewayUrl?.includes('build.cloudflare.dev') || 
+                    !apiKey?.startsWith('sk-') || 
+                    apiKey?.includes('YOUR');
     if (this.mockMode) {
-      console.log('Fallback mode: AI gateway not configured');
+      console.log('Mock mode activated due to invalid AI gateway config:', aiGatewayUrl, apiKey ? 'key-present' : 'no-key');
       console.log('Note: Limited AI requests available across all user apps.');
       this.model = model;
       return;
