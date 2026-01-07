@@ -22,23 +22,31 @@ class ChatService {
   }
 
   async sendMessage(
-    message: string, 
-    model?: string, 
+    message: string,
+    model?: string,
     onChunk?: (chunk: string) => void
   ): Promise<ChatResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, model, stream: !!onChunk }),
+        body: JSON.stringify({ message, model, stream: !!onChunk })
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Send message HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      
       if (onChunk && response.body) {
-        // Handle streaming response
+        // Handle streaming response - preserve existing logic
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = '';
@@ -60,26 +68,55 @@ class ChatService {
 
         return { success: true };
       }
-      
-      // Non-streaming response
+
+      // Non-streaming response - check content-type before json()
+      if (!contentType.includes('application/json')) {
+        console.error('Invalid content-type for JSON response:', {
+          contentType
+        });
+        return { success: false, error: `Invalid response format: ${contentType}` };
+      }
+
       return await response.json();
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      return { success: false, error: 'Failed to send message' };
+    } catch (error: any) {
+      console.error('Send message network error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      return { success: false, error: `Network error: ${error.message}` };
     }
   }
 
   async getMessages(): Promise<ChatResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/messages`);
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Get messages HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
       }
-      
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        console.error('Invalid content-type for getMessages:', {
+          contentType
+        });
+        return { success: false, error: `Invalid response format: ${contentType}` };
+      }
+
       return await response.json();
-    } catch (error) {
-      console.error('Failed to get messages:', error);
+    } catch (error: any) {
+      console.error('Get messages error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to load messages' };
     }
   }
@@ -89,14 +126,32 @@ class ChatService {
       const response = await fetch(`${this.baseUrl}/clear`, {
         method: 'DELETE'
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Clear messages HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
       }
-      
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        console.error('Invalid content-type for clearMessages:', {
+          contentType
+        });
+        return { success: false, error: `Invalid response format: ${contentType}` };
+      }
+
       return await response.json();
-    } catch (error) {
-      console.error('Failed to clear messages:', error);
+    } catch (error: any) {
+      console.error('Clear messages error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to clear messages' };
     }
   }
@@ -123,8 +178,24 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, sessionId, firstMessage })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Create session HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
+      }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Create session error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to create session' };
     }
   }
@@ -132,8 +203,24 @@ class ChatService {
   async listSessions(): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
     try {
       const response = await fetch('/api/sessions');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('List sessions HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
+      }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('List sessions error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to list sessions' };
     }
   }
@@ -141,8 +228,24 @@ class ChatService {
   async deleteSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete session HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
+      }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Delete session error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to delete session' };
     }
   }
@@ -154,8 +257,24 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Update session title HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
+      }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Update session title error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to update session title' };
     }
   }
@@ -163,8 +282,24 @@ class ChatService {
   async clearAllSessions(): Promise<{ success: boolean; data?: { deletedCount: number }; error?: string }> {
     try {
       const response = await fetch('/api/sessions', { method: 'DELETE' });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Clear all sessions HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
+      }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Clear all sessions error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to clear all sessions' };
     }
   }
@@ -176,14 +311,32 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model })
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Update model HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.slice(0, 1000)
+        });
+        return { success: false, error: `HTTP ${response.status}: ${errorText.slice(0, 200)}` };
       }
-      
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        console.error('Invalid content-type for updateModel:', {
+          contentType
+        });
+        return { success: false, error: `Invalid response format: ${contentType}` };
+      }
+
       return await response.json();
-    } catch (error) {
-      console.error('Failed to update model:', error);
+    } catch (error: any) {
+      console.error('Update model error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: 'Failed to update model' };
     }
   }
