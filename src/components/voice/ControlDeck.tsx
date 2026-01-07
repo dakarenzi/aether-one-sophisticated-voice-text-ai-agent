@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Mic, MicOff, MessageSquare, Power } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -6,6 +6,7 @@ import { useAetherStore } from '@/hooks/use-aether-session';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { useSpeechSynthesis } from '@/hooks/use-speech-synthesis';
+import { useSpeechRecognition, SpeechResult } from '@/hooks/use-speech-recognition';
 import { toast } from 'sonner';
 export function ControlDeck() {
   const isMicActive = useAetherStore(s => s.isMicActive);
@@ -17,20 +18,31 @@ export function ControlDeck() {
   const messages = useAetherStore(s => s.messages);
   const clearHistory = useAetherStore(s => s.clearHistory);
   const setAgentState = useAetherStore(s => s.setAgentState);
-  const { isRecording, startRecording, stopRecording, frequencyData } = useAudioRecorder();
+  const sendMessage = useAetherStore(s => s.sendMessage);
+  const interruptAgent = useAetherStore(s => s.interruptAgent);
+  const { startRecording, stopRecording, frequencyData } = useAudioRecorder();
   const { isSpeaking, speak, stop: stopSpeech } = useSpeechSynthesis();
-  // Sync recorder data to store
+  const onSpeechResult = useCallback((result: SpeechResult) => {
+    if (!result.isFinal) {
+      // Barge-in: Interrupt if user starts speaking
+      interruptAgent();
+    } else {
+      // Process final speech
+      if (result.transcript.trim()) {
+        sendMessage(result.transcript);
+      }
+    }
+  }, [interruptAgent, sendMessage]);
+  const { startListening, stopListening } = useSpeechRecognition(onSpeechResult);
   useEffect(() => {
     setVisualizerData(frequencyData);
   }, [frequencyData, setVisualizerData]);
-  // Handle TTS for new assistant messages
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
-    if (lastMsg?.role === 'assistant' && !isSpeaking) {
+    if (lastMsg?.role === 'assistant' && !isSpeaking && agentState === 'speaking') {
       speak(lastMsg.content);
     }
-  }, [messages, speak, isSpeaking]);
-  // Update store state based on TTS
+  }, [messages, speak, isSpeaking, agentState]);
   useEffect(() => {
     if (isSpeaking) {
       setAgentState('speaking');
@@ -41,23 +53,26 @@ export function ControlDeck() {
   const handleMicToggle = async () => {
     try {
       if (!isMicActive) {
-        if (isSpeaking) stopSpeech(); // Barge-in
+        if (isSpeaking) stopSpeech();
         await startRecording();
+        startListening();
         setMicActive(true);
       } else {
         stopRecording();
+        stopListening();
         setMicActive(false);
       }
     } catch (err) {
-      toast.error("Microphone access denied. Please check permissions.");
+      toast.error("Permission denied. Check microphone settings.");
     }
   };
   const handleEndSession = () => {
     stopRecording();
+    stopListening();
     stopSpeech();
     setMicActive(false);
     clearHistory();
-    toast.success("Session ended and history cleared.");
+    toast.success("Session ended.");
   };
   return (
     <TooltipProvider>
@@ -70,18 +85,18 @@ export function ControlDeck() {
                 variant="ghost"
                 className={cn(
                   "rounded-full w-12 h-12 transition-all duration-300 relative",
-                  isMicActive ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "hover:bg-white/10"
+                  isMicActive ? "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30" : "hover:bg-white/10"
                 )}
                 onClick={handleMicToggle}
               >
                 {isMicActive && (
-                  <span className="absolute inset-0 rounded-full border-2 border-red-500 animate-ping opacity-25" />
+                  <span className="absolute inset-0 rounded-full border-2 border-cyan-500 animate-ping opacity-25" />
                 )}
                 {isMicActive ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6 text-muted-foreground" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isMicActive ? "Mute Microphone" : "Unmute Microphone"}</p>
+              <p>{isMicActive ? "Stop Listening" : "Enable Voice Mode"}</p>
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -99,7 +114,7 @@ export function ControlDeck() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Toggle Chat Transcript</p>
+              <p>Chat Transcript</p>
             </TooltipContent>
           </Tooltip>
           <div className="h-8 w-[1px] bg-white/10 mx-2" />
@@ -115,13 +130,13 @@ export function ControlDeck() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>End Session</p>
+              <p>Exit Aether</p>
             </TooltipContent>
           </Tooltip>
         </div>
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">
-            AI CORE: {agentState}
+            {isMicActive ? 'Aether is Listening' : `System: ${agentState}`}
            </span>
         </div>
       </div>

@@ -20,6 +20,7 @@ interface AetherSessionActions {
   handleStreamingResponse: (content: string) => void;
   clearHistory: () => void;
   setModel: (model: string) => void;
+  interruptAgent: () => void;
 }
 export const useAetherStore = create<AetherSessionState & AetherSessionActions>((set, get) => ({
   messages: [],
@@ -32,22 +33,31 @@ export const useAetherStore = create<AetherSessionState & AetherSessionActions>(
   setAgentState: (agentState) => set({ agentState }),
   setMicActive: (isMicActive) => {
     set({ isMicActive });
-    // If mic turns on while agent is speaking, we stop agent speech (Barge-in logic managed in components)
     if (isMicActive) {
       set({ agentState: 'listening' });
     } else {
-      set({ agentState: 'idle' });
+      const { isProcessing } = get();
+      if (!isProcessing) set({ agentState: 'idle' });
     }
   },
   setChatOpen: (isChatOpen) => set({ isChatOpen }),
   setVisualizerData: (visualizerData) => set({ visualizerData }),
   setModel: (currentModel) => set({ currentModel }),
+  interruptAgent: () => {
+    const { agentState } = get();
+    if (agentState === 'speaking' || agentState === 'thinking') {
+      window.speechSynthesis.cancel();
+      set({ agentState: 'listening' });
+    }
+  },
   handleStreamingResponse: (chunk) => {
-    // This will be called by chatService in Phase 3 mostly
+    // For future expansion of UI streaming
   },
   sendMessage: async (content) => {
     if (!content.trim()) return;
     const { messages, currentModel } = get();
+    // Stop any active speech before sending new message
+    window.speechSynthesis.cancel();
     set({ isProcessing: true, agentState: 'thinking' });
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -64,7 +74,8 @@ export const useAetherStore = create<AetherSessionState & AetherSessionActions>(
           agentState: 'speaking',
           isProcessing: false
         });
-        // Final state will be reset by the TTS hook finishing
+      } else {
+        set({ isProcessing: false, agentState: 'idle' });
       }
     } catch (error) {
       console.error('Failed to send message:', error);
