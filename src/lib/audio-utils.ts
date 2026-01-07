@@ -20,8 +20,7 @@ export class AudioAnalyzer {
     }
     this.analyzer = this.context.createAnalyser();
     this.analyzer.fftSize = 256;
-    // Fixed: createMediaStreamAudioSource -> createMediaStreamSource
-    this.source = this.context.createMediaStreamSource(stream);
+    this.source = this.context.createMediaStreamAudioSource(stream);
     this.source.connect(this.analyzer);
     this.dataArray = new Uint8Array(this.analyzer.frequencyBinCount);
   }
@@ -49,18 +48,13 @@ export class AudioAnalyzer {
     }
     return sum / this.dataArray.length / 255;
   }
-  reset(): void {
-    if (this.dataArray) {
-      this.dataArray.fill(0);
-    }
-  }
   close(): void {
     if (this.source) {
       this.source.disconnect();
       this.source = null;
     }
     this.analyzer = null;
-    this.reset();
+    // We don't close the context to allow reuse, but we could if needed
   }
 }
 export const audioAnalyzer = AudioAnalyzer.getInstance();

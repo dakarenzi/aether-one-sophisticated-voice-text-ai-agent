@@ -1,60 +1,92 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { VoiceOrb } from '@/components/voice/VoiceOrb';
 import { ControlDeck } from '@/components/voice/ControlDeck';
 import { ChatOverlay } from '@/components/chat/ChatOverlay';
 import { SettingsDrawer } from '@/components/settings/SettingsDrawer';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Toaster } from '@/components/ui/sonner';
+import { useAetherStore } from '@/hooks/use-aether-session';
+import { cn } from '@/lib/utils';
 export default function AetherInterface() {
+  const agentState = useAetherStore(s => s.agentState);
+  // Map agent state to background vibes
+  const bgStyles = {
+    idle: "from-slate-950 via-slate-900 to-slate-950",
+    listening: "from-slate-950 via-cyan-950/20 to-slate-950",
+    thinking: "from-slate-950 via-indigo-950/30 to-slate-950",
+    speaking: "from-slate-950 via-emerald-950/20 to-slate-950"
+  };
   return (
-    <div className="relative h-screen w-full bg-[#020617] overflow-hidden flex flex-col items-center justify-center text-slate-50">
-      {/* Background Animated Gradient */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-indigo-950/20 to-slate-950" />
-        <motion.div 
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.1, 0.15, 0.1],
-          }}
-          transition={{ duration: 10, repeat: Infinity }}
-          className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full"
-        />
-        <motion.div 
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.05, 0.1, 0.05],
-          }}
-          transition={{ duration: 12, repeat: Infinity, delay: 2 }}
-          className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-cyan-500/10 blur-[120px] rounded-full"
-        />
-      </div>
-      {/* Top Navigation / Status */}
-      <div className="absolute top-6 left-6 z-50 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-          <span className="text-sm font-mono tracking-tighter text-white/70">AETHER-ONE // ONLINE</span>
-        </div>
-      </div>
-      <ThemeToggle className="fixed top-6 right-6" />
-      <SettingsDrawer />
-      {/* Center Stage: The Orb */}
-      <main className="relative z-10 flex flex-col items-center gap-12">
+    <div className={cn(
+      "relative h-screen w-full overflow-hidden flex flex-col items-center justify-center text-slate-50 transition-colors duration-1000 bg-background",
+      bgStyles[agentState]
+    )}>
+      {/* Immersive Background Effects */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          animate={{
+            scale: agentState === 'thinking' ? [1, 1.2, 1] : 1,
+            opacity: agentState === 'idle' ? 0.05 : 0.15,
+          }}
+          className="absolute -top-1/4 -left-1/4 w-full h-full bg-indigo-500/20 blur-[120px] rounded-full"
+        />
+        <motion.div
+          animate={{
+            scale: agentState === 'listening' ? [1, 1.3, 1] : 1,
+            opacity: agentState === 'idle' ? 0.03 : 0.1,
+          }}
+          className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-cyan-500/20 blur-[120px] rounded-full"
+        />
+      </div>
+      {/* Connection Metadata */}
+      <header className="absolute top-6 left-6 z-50 flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-2 h-2 rounded-full animate-pulse",
+            agentState === 'idle' ? "bg-slate-500" : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+          )} />
+          <div className="flex flex-col">
+            <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase">Aether-One System</span>
+            <span className="text-xs font-mono text-white/80 tracking-tighter">
+              {agentState === 'idle' ? 'LINK_READY' : 'STREAM_ACTIVE'} // v1.0.4
+            </span>
+          </div>
+        </div>
+      </header>
+      <div className="flex items-center gap-2 fixed top-6 right-6 z-50">
+        <ThemeToggle className="relative top-0 right-0" />
+        <SettingsDrawer />
+      </div>
+      {/* Main Sensory Stage */}
+      <main className="relative z-10 flex flex-col items-center gap-16 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="text-center space-y-2"
+          className="text-center"
         >
-          <h1 className="text-3xl md:text-4xl font-display font-light tracking-widest text-white/90">AETHER</h1>
-          <p className="text-xs md:text-sm font-mono text-white/40 uppercase tracking-[0.3em]">Quantum Conversational Interface</p>
+          <motion.h1 
+            animate={{ letterSpacing: agentState === 'thinking' ? "0.5em" : "0.3em" }}
+            className="text-4xl md:text-5xl font-display font-extralight text-white/90 uppercase"
+          >
+            Aether
+          </motion.h1>
+          <p className="mt-2 text-[10px] font-mono text-white/30 uppercase tracking-[0.4em]">
+            Neural Multi-Modal Interface
+          </p>
         </motion.div>
         <VoiceOrb />
       </main>
-      {/* Collateral UI Components */}
+      {/* Secondary Interface Layers */}
       <ControlDeck />
       <ChatOverlay />
-      <Toaster richColors position="bottom-right" theme="dark" />
+      <Toaster richColors position="top-center" theme="dark" />
+      {/* Global Watermark */}
+      <div className="absolute bottom-6 left-6 pointer-events-none">
+        <p className="text-[9px] font-mono text-white/10 uppercase tracking-widest">
+          Secure Edge Protocol // Cloudflare DO
+        </p>
+      </div>
     </div>
   );
 }
