@@ -237,6 +237,32 @@ export class ChatHandler {
   }
 
   /**
+   * Transcribe audio file to text using Whisper
+   */
+  public async transcribeAudio(audioFile: File): Promise<string> {
+    const bytes = await audioFile.arrayBuffer();
+    const transcription = await this.client.audio.transcriptions.create({
+      model: 'whisper-1',
+      file: new File([bytes], 'audio.webm'),
+      language: 'en',
+      response_format: 'text'
+    });
+    return transcription;
+  }
+
+  /**
+   * Synthesize text to speech audio
+   */
+  public async synthesizeSpeech(text: string): Promise<Blob> {
+    const speech = await this.client.audio.speech.create({
+      model: 'tts-1',
+      voice: 'alloy',
+      input: text
+    });
+    return new Blob([await speech.arrayBuffer()], { type: 'audio/mpeg' });
+  }
+
+  /**
    * Update the model for this chat handler
    */
   updateModel(newModel: string): void {

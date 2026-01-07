@@ -137,16 +137,18 @@ export class ChatAgent extends Agent<Env, ChatState> {
         // Start processing in background
         (async () => {
           try {
-            this.setState({ ...this.state, streamingMessage: '' });
+            const initialState = { ...this.state };
+            this.setState({ ...initialState, streamingMessage: '' });
 
             const response = await this.chatHandler!.processMessage(
               message,
               currentMessages,
               (chunk: string) => {
                 try {
-                  this.setState({ 
-                    ...this.state, 
-                    streamingMessage: (this.state.streamingMessage || '') + chunk 
+                  const currentStreaming = this.state.streamingMessage || '';
+                  this.setState({
+                    ...this.state,
+                    streamingMessage: currentStreaming + chunk
                   });
                   writer.write(encoder.encode(chunk));
                 } catch (writeError) {
@@ -156,23 +158,23 @@ export class ChatAgent extends Agent<Env, ChatState> {
             );
 
             const assistantMessage = createMessage('assistant', response.content, response.toolCalls);
-            
-            // Update state with final response
+
+            // Update state with final response using captured messages (consistent with error path)
             this.setState({
               ...this.state,
-              messages: [...this.state.messages, assistantMessage],
+              messages: [...currentMessages, userMessage, assistantMessage],
               isProcessing: false,
               streamingMessage: ''
             });
-            
+
           } catch (error) {
             console.error('Streaming error:', error);
-            
+
             // Write error to stream
             try {
               const errorMessage = 'Sorry, I encountered an error processing your request.';
               writer.write(encoder.encode(errorMessage));
-              
+
               const errorMsg = createMessage('assistant', errorMessage);
               this.setState({
                 ...this.state,
@@ -203,11 +205,11 @@ export class ChatAgent extends Agent<Env, ChatState> {
       );
 
       const assistantMessage = createMessage('assistant', response.content, response.toolCalls);
-      
-      // Update state with response
+
+      // Update state with response using captured messages to avoid race conditions
       this.setState({
         ...this.state,
-        messages: [...this.state.messages, assistantMessage],
+        messages: [...currentMessages, assistantMessage],
         isProcessing: false
       });
       
@@ -270,17 +272,15 @@ export class ChatAgent extends Agent<Env, ChatState> {
         }, { status: 400 });
       }
 
-      const bytes = await audioFile.arrayBuffer();
-      const transcription = await this.chatHandler!.client.audio.transcriptions.create({
-        model: 'whisper-1',
-        file: new File([bytes], 'audio.webm'),
-        language: 'en',
-        response_format: 'text'
-      });
+      if (!this.chatHandler) {
+        throw new Error('Chat handler not initialized');
+      }
+
+      const transcription = await this.chatHandler!.transcribeAudio(audioFile);
 
       return Response.json({
         success: true,
-        transcript: transcription.text
+        transcript: transcription
       });
 
     } catch (error) {
@@ -307,14 +307,13 @@ export class ChatAgent extends Agent<Env, ChatState> {
         }, { status: 400 });
       }
 
-      const speech = await this.chatHandler!.client.audio.speech.create({
-        model: 'tts-1',
-        voice: 'alloy',
-        input: text.trim()
-      });
+      if (!this.chatHandler) {
+        throw new Error('Chat handler not initialized');
+      }
 
-      const buffer = await speech.arrayBuffer();
-      return new Response(buffer, {
+      const audioBlob = await this.chatHandler!.synthesizeSpeech(text.trim());
+
+      return new Response(await audioBlob.arrayBuffer(), {
         headers: {
           'Content-Type': 'audio/mpeg'
         }

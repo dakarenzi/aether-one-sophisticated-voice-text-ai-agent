@@ -42,14 +42,14 @@ export function ControlDeck() {
     if (lastMsg?.role === 'assistant' && !isSpeaking && agentState === 'speaking') {
       speak(lastMsg.content);
     }
-  }, [messages, speak, isSpeaking, agentState]);
+  }, [messages, isSpeaking, agentState, speak]);
   useEffect(() => {
     if (isSpeaking) {
       setAgentState('speaking');
     } else if (agentState === 'speaking') {
       setAgentState('idle');
     }
-  }, [isSpeaking, setAgentState, agentState]);
+  }, [isSpeaking, agentState, setAgentState]);
   const handleMicToggle = async () => {
     try {
       if (!isMicActive) {
@@ -63,7 +63,11 @@ export function ControlDeck() {
         setMicActive(false);
       }
     } catch (err) {
-      toast.error("Permission denied. Check microphone settings.");
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        toast.error('Microphone permission denied. Click the lock/camera icon in address bar, allow microphone, then refresh page.');
+      } else {
+        toast.error('Microphone access failed. Check device and browser settings.');
+      }
     }
   };
   const handleEndSession = () => {
