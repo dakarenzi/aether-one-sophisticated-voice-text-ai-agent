@@ -10,11 +10,20 @@ import { ChatCompletionMessageFunctionToolCall } from 'openai/resources/index.mj
  * making it easy for AI developers to understand and extend the functionality.
  */
 export class ChatHandler {
-  private client: OpenAI;
+  private client?: OpenAI;
   private model: string;
+  private mockMode: boolean = false;
 
   constructor(aiGatewayUrl: string, apiKey: string, model: string) {
-    this.client = new OpenAI({ 
+    this.mockMode = !aiGatewayUrl || !apiKey;
+    if (this.mockMode) {
+      console.log('Fallback mode: AI gateway not configured');
+      console.log('Note: Limited AI requests available across all user apps.');
+      this.model = model;
+      return;
+    }
+
+    this.client = new OpenAI({
       baseURL: aiGatewayUrl,
       apiKey: apiKey
     });
@@ -26,19 +35,32 @@ export class ChatHandler {
    * Process a user message and generate AI response with optional tool usage
    */
   async processMessage(
-    message: string, 
-    conversationHistory: Message[], 
+    message: string,
+    conversationHistory: Message[],
     onChunk?: (chunk: string) => void
   ): Promise<{
     content: string;
     toolCalls?: ToolCall[];
   }> {
+    if (this.mockMode) {
+      const fallbackContent = `Hello! You mentioned: "${message}". Fallback active - AI Gateway unavailable. Limited requests to AI servers per time period across all user apps.`;
+      if (onChunk) {
+        // Simulate streaming: split into words, call onChunk every 100ms
+        const words = fallbackContent.split(' ');
+        for (const word of words) {
+          await new Promise(r => setTimeout(r, 100));
+          onChunk(word + ' ');
+        }
+      }
+      return { content: fallbackContent };
+    }
+
     const messages = this.buildConversationMessages(message, conversationHistory);
     const toolDefinitions = await getToolDefinitions();
     
     if (onChunk) {
       // Use streaming with callback
-      const stream = await this.client.chat.completions.create({
+      const stream = await this.client!.chat.completions.create({
         model: this.model,
         messages,
         tools: toolDefinitions,
@@ -52,7 +74,7 @@ export class ChatHandler {
     }
 
     // Non-streaming response
-    const completion = await this.client.chat.completions.create({
+    const completion = await this.client!.chat.completions.create({
       model: this.model,
       messages,
       tools: toolDefinitions,
@@ -186,7 +208,7 @@ export class ChatHandler {
     openAiToolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[], 
     toolResults: ToolCall[]
   ): Promise<string> {
-    const followUpCompletion = await this.client.chat.completions.create({
+    const followUpCompletion = await this.client!.chat.completions.create({
       model: this.model,
       messages: [
         { role: 'system', content: 'You are a helpful AI assistant. Respond naturally to the tool results.' },
@@ -240,8 +262,11 @@ export class ChatHandler {
    * Transcribe audio file to text using Whisper
    */
   public async transcribeAudio(audioFile: File): Promise<string> {
+    if (this.mockMode) {
+      return 'Fallback transcription unavailable - AI Gateway not configured.';
+    }
     const bytes = await audioFile.arrayBuffer();
-    const transcription = await this.client.audio.transcriptions.create({
+    const transcription = await this.client!.audio.transcriptions.create({
       model: 'whisper-1',
       file: new File([bytes], 'audio.webm'),
       language: 'en',
@@ -254,7 +279,10 @@ export class ChatHandler {
    * Synthesize text to speech audio
    */
   public async synthesizeSpeech(text: string): Promise<Blob> {
-    const speech = await this.client.audio.speech.create({
+    if (this.mockMode) {
+      throw new Error('Fallback TTS unavailable - AI Gateway not configured.');
+    }
+    const speech = await this.client!.audio.speech.create({
       model: 'tts-1',
       voice: 'alloy',
       input: text
