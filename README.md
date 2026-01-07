@@ -15,22 +15,6 @@ A full-stack AI chat application built on Cloudflare Workers. Features persisten
 - **Type-Safe**: Full TypeScript coverage for frontend and Workers backend
 - **Production-Ready**: Durable Objects for state, CORS, error handling, health checks
 
-## 🔊 Voice Pipeline (Cloudflare-native)
-Uses Workers AI Whisper for STT, Gemini for reasoning, SpeechT5 for TTS via AI Gateway. Real-time barge-in via client VAD. Low-latency HTTP batch processing (~1-2s E2E). Privacy-focused - no third-party STT servers.
-
-```mermaid
-graph LR
-A[Microphone] --> B[MediaRecorder webm/opus]
-B --> C[Silence Detect VAD]
-C --> D[POST /voice-stt]
-D --> E[Whisper-1 STT]
-E --> F[Gemini Agent]
-F --> G[POST /voice-tts]
-G --> H[TTS-1 Audio/mp3]
-H --> I[Browser Play]
-J[Volume Monitor during play] --> K[Interrupt if speaking]
-```
-
 ## 🛠 Tech Stack
 
 ### Frontend
@@ -90,19 +74,14 @@ bun build
 
 ## 📖 Usage
 
-1. **Voice Mode**: Click microphone icon → speak naturally → hear AI responses with barge-in interruption support
-2. **Text Chat**: Type messages in input box (shares same session context as voice)
-3. **Start Chatting**: Send messages via the UI – supports streaming and model switching
-4. **Manage Sessions**: Create new chats, switch sessions, rename/delete via sidebar
-5. **Voice Controls**: Mic on/off, speaker mute, VAD sensitivity slider (Settings)
-6. **Tools**: Ask about weather (`get_weather`), search web (`web_search`), or use MCP tools
-7. **API Endpoints**:
+1. **Start Chatting**: Send messages via the UI – supports streaming and model switching
+2. **Manage Sessions**: Create new chats, switch sessions, rename/delete via sidebar
+3. **Tools**: Ask about weather (`get_weather`), search web (`web_search`), or use MCP tools
+4. **API Endpoints**:
    - `POST /api/sessions` – Create session
    - `GET /api/sessions` – List sessions
    - `POST /api/chat/:sessionId/chat` – Send message
    - `GET /api/chat/:sessionId/messages` – Get chat state
-   - `POST /api/voice-stt` – Speech-to-text endpoint
-   - `POST /api/voice-tts` – Text-to-speech endpoint
 
 Example chat:
 ```
