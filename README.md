@@ -1,6 +1,6 @@
 # Aether One
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dakarenzi/aether-one-sophisticated-voice-text-ai-agent)
 
 A full-stack AI chat application built on Cloudflare Workers. Features persistent multi-session conversations, streaming AI responses powered by Cloudflare AI Gateway (Gemini models), tool calling (web search, weather, MCP integration), and a modern responsive UI with session management.
 
@@ -120,7 +120,7 @@ bun deploy
 
 Or use the [Deploy to Cloudflare](https://deploy.workers.cloudflare.com) button:
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dakarenzi/aether-one-sophisticated-voice-text-ai-agent)
 
 This deploys both Workers (API + Durable Objects) and Pages (frontend).
 
