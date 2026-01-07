@@ -18,6 +18,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
     messages: [],
     sessionId: crypto.randomUUID(),
     isProcessing: false,
+    streamingMessage: '',
     model: 'google-ai-studio/gemini-2.5-flash'
   };
 
@@ -26,7 +27,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
    */
   async onStart(): Promise<void> {
     this.chatHandler = new ChatHandler(
-      this.env.CF_AI_BASE_URL ,
+      this.env.CF_AI_BASE_URL,
       this.env.CF_AI_API_KEY,
       this.state.model
     );
@@ -55,13 +56,21 @@ export class ChatAgent extends Agent<Env, ChatState> {
         return this.handleClearMessages();
       }
 
+      if (method === 'POST' && url.pathname === '/voice-stt') {
+        return this.handleVoiceSTT(request);
+      }
+
+      if (method === 'POST' && url.pathname === '/voice-tts') {
+        return this.handleVoiceTTS(request);
+      }
+
       if (method === 'POST' && url.pathname === '/model') {
         return this.handleModelUpdate(await request.json());
       }
-      
-      return Response.json({ 
-        success: false, 
-        error: API_RESPONSES.NOT_FOUND 
+
+      return Response.json({
+        success: false,
+        error: API_RESPONSES.NOT_FOUND
       }, { status: 404 });
 
     } catch (error) {
@@ -122,14 +131,17 @@ export class ChatAgent extends Agent<Env, ChatState> {
         const writer = writable.getWriter();
         const encoder = createEncoder();
         
+        // Capture current messages before async processing to avoid stale closure
+        const currentMessages = this.state.messages;
+
         // Start processing in background
         (async () => {
           try {
             this.setState({ ...this.state, streamingMessage: '' });
-            
+
             const response = await this.chatHandler!.processMessage(
-              message, 
-              this.state.messages,
+              message,
+              currentMessages,
               (chunk: string) => {
                 try {
                   this.setState({ 
@@ -164,7 +176,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
               const errorMsg = createMessage('assistant', errorMessage);
               this.setState({
                 ...this.state,
-                messages: [...this.state.messages, errorMsg],
+                messages: [...currentMessages, userMessage, errorMsg],
                 isProcessing: false,
                 streamingMessage: ''
               });
@@ -184,9 +196,10 @@ export class ChatAgent extends Agent<Env, ChatState> {
       }
 
       // Non-streaming response
+      const currentMessages = this.state.messages;
       const response = await this.chatHandler.processMessage(
-        message, 
-        this.state.messages
+        message,
+        currentMessages
       );
 
       const assistantMessage = createMessage('assistant', response.content, response.toolCalls);
@@ -232,13 +245,87 @@ export class ChatAgent extends Agent<Env, ChatState> {
    */
   private handleModelUpdate(body: { model: string }): Response {
     const { model } = body;
-    
+
     this.setState({ ...this.state, model });
     this.chatHandler?.updateModel(model);
-    
-    return Response.json({ 
-      success: true, 
-      data: this.state 
+
+    return Response.json({
+      success: true,
+      data: this.state
     });
+  }
+
+  /**
+   * Handle voice STT transcription request
+   */
+  private async handleVoiceSTT(request: Request): Promise<Response> {
+    try {
+      const formData = await request.formData();
+      const audioFile = formData.get('audio') as File;
+
+      if (!audioFile) {
+        return Response.json({
+          success: false,
+          error: API_RESPONSES.MISSING_MESSAGE
+        }, { status: 400 });
+      }
+
+      const bytes = await audioFile.arrayBuffer();
+      const transcription = await this.chatHandler!.client.audio.transcriptions.create({
+        model: 'whisper-1',
+        file: new File([bytes], 'audio.webm'),
+        language: 'en',
+        response_format: 'text'
+      });
+
+      return Response.json({
+        success: true,
+        transcript: transcription.text
+      });
+
+    } catch (error) {
+      console.error('STT error:', error);
+      return Response.json({
+        success: false,
+        error: API_RESPONSES.PROCESSING_ERROR
+      }, { status: 500 });
+    }
+  }
+
+  /**
+   * Handle voice TTS speech synthesis request
+   */
+  private async handleVoiceTTS(request: Request): Promise<Response> {
+    try {
+      const body = await request.json<{ text: string }>();
+      const { text } = body;
+
+      if (!text?.trim()) {
+        return Response.json({
+          success: false,
+          error: API_RESPONSES.MISSING_MESSAGE
+        }, { status: 400 });
+      }
+
+      const speech = await this.chatHandler!.client.audio.speech.create({
+        model: 'tts-1',
+        voice: 'alloy',
+        input: text.trim()
+      });
+
+      const buffer = await speech.arrayBuffer();
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': 'audio/mpeg'
+        }
+      });
+
+    } catch (error) {
+      console.error('TTS error:', error);
+      return Response.json({
+        success: false,
+        error: API_RESPONSES.PROCESSING_ERROR
+      }, { status: 500 });
+    }
   }
 }

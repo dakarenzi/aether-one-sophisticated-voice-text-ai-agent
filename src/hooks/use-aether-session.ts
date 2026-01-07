@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { chatService } from '@/lib/chat';
+import { toast } from "sonner";
 import type { Message } from '../../worker/types';
 import type { AgentState } from '@/lib/visualizer-utils';
 interface AetherSessionState {
@@ -21,6 +22,8 @@ interface AetherSessionActions {
   clearHistory: () => void;
   setModel: (model: string) => void;
   interruptAgent: () => void;
+  exportSession: () => void;
+  exportTranscript: () => void;
 }
 export const useAetherStore = create<AetherSessionState & AetherSessionActions>((set, get) => ({
   messages: [],
@@ -85,5 +88,47 @@ export const useAetherStore = create<AetherSessionState & AetherSessionActions>(
   clearHistory: async () => {
     await chatService.clearMessages();
     set({ messages: [], agentState: 'idle' });
+  },
+
+  exportSession: () => {
+    const { messages, currentModel } = get();
+    const sessionId = chatService.getSessionId();
+    const data = {
+      sessionId,
+      currentModel,
+      timestamp: Date.now(),
+      messages
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aether-${sessionId.slice(0,8)}.json`;
+    if (document.body) {
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    URL.revokeObjectURL(url);
+    toast.success('Session exported!');
+  },
+
+  exportTranscript: () => {
+    const { messages } = get();
+    const sessionId = chatService.getSessionId();
+    const transcript = messages.map(msg => `${msg.role.toUpperCase()}: ${msg.content}\n\n`).join('');
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aether-transcript-${sessionId.slice(0,8)}.txt`;
+    if (document.body) {
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported!');
   }
 }));

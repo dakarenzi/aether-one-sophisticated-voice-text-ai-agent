@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
 import { HomePage } from '@/pages/HomePage'
+import AetherInterface from '@/pages/AetherInterface';
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,11 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <HomePage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/aether",
+    element: <AetherInterface />,
     errorElement: <RouteErrorBoundary />,
   },
 ]);
